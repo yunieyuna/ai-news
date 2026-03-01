@@ -28,6 +28,8 @@ class NewsItem:
     raw: dict[str, Any]
     # For sorting: time struct (year, month, day, ...) or None
     published_parsed: tuple[int, ...] | None = field(default=None, repr=False)
+    # Fetched full article text (set by fetch_full_articles when fetch_full_content is on)
+    full_text: str | None = field(default=None, repr=False)
 
 
 def _strip_html(text: str) -> str:

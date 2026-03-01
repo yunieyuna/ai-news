@@ -3,15 +3,21 @@ gather:
   max_items_per_feed: 10
   request_timeout_seconds: 15
   dedupe_by_link: true
+  # Fetch full article body from each link and use it for summarization (slower, better quality)
+  fetch_full_content: true
+  max_articles_to_fetch: 15
+  article_timeout_seconds: 12
   # If set, keep only items whose title or summary contains any of these (case-insensitive)
   filter_keywords: []
   # Example to keep only AI-related: ["AI", "GPT", "LLM", "machine learning", "OpenAI", "anthropic"]
 
 analyze:
-  # Options: openai, groq, none (none = skip summarization, save raw; default = no API cost)
-  provider: none
-  model: llama-3.3-70b-versatile  # Groq free tier
-  max_tokens: 500
+  # Options: ollama (local, free), groq (free tier), openai (paid), none
+  provider: ollama
+  model: llama3.2
+  max_tokens: 1200
+  # Only for provider=ollama: base URL (default http://localhost:11434/v1)
+  # ollama_base_url: http://localhost:11434/v1
 
 store:
   backend: local

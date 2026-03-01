@@ -7,7 +7,7 @@ from __future__ import annotations
 import argparse
 import sys
 
-from src.gather import fetch_rss_items
+from src.gather import fetch_rss_items, fetch_full_articles
 from src.analyze import summarize_items
 from src.analyze.summarize import SummarizedDigest
 from src.store import save_digest
@@ -39,6 +39,7 @@ def main() -> int:
 
     # 1. Gather
     items = fetch_rss_items()
+    items = fetch_full_articles(items)
     if not items:
         logger.warning("No items gathered. Check config/sources.yaml and network.")
         if not args.dry_run and notify_cfg.get("send_on_failure"):

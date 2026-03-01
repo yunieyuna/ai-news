@@ -2,12 +2,13 @@
 pyyaml>=6.0
 python-dotenv>=1.0.0
 
-# Gather (RSS, no API cost)
+# Gather (RSS + full-article extraction)
 feedparser>=6.0.0
 httpx>=0.25.0
+trafilatura>=1.6.0
 
-# Analyze (use one; groq is free tier)
-# openai>=1.0.0
+# Analyze (Ollama uses OpenAI client with base_url; Groq/OpenAI optional)
+openai>=1.0.0
 groq>=0.4.0
 
 # Notify (SMTP = free)

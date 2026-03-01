@@ -3,76 +3,317 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>AI News Digest</title>
+  <title>AI News Digest · Dashboard</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700&family=DM+Serif+Display&display=swap" rel="stylesheet">
   <style>
+    :root {
+      --bg: #0f0f12;
+      --surface: #18181c;
+      --surface-hover: #1f1f24;
+      --border: #2a2a30;
+      --text: #e4e4e7;
+      --text-muted: #71717a;
+      --accent: #6366f1;
+      --accent-hover: #818cf8;
+      --accent-muted: rgba(99, 102, 241, 0.2);
+      --radius: 12px;
+      --radius-sm: 8px;
+    }
     * { box-sizing: border-box; }
     body {
-      font-family: system-ui, -apple-system, sans-serif;
-      max-width: 900px;
-      margin: 0 auto;
-      padding: 1rem 1.5rem;
-      color: #1a1a1a;
-      background: #f8f9fa;
+      font-family: "DM Sans", system-ui, sans-serif;
+      margin: 0;
+      min-height: 100vh;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+      -webkit-font-smoothing: antialiased;
     }
-    h1 { font-size: 1.5rem; margin-bottom: 0.5rem; }
-    .sub { color: #666; font-size: 0.9rem; margin-bottom: 1.5rem; }
-    .layout { display: flex; gap: 1.5rem; align-items: start; }
-    .sidebar {
-      width: 220px;
-      flex-shrink: 0;
-      background: #fff;
-      border-radius: 8px;
-      padding: 0.75rem;
-      box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+    .app {
+      display: grid;
+      grid-template-columns: 280px 1fr;
+      grid-template-rows: auto 1fr;
+      min-height: 100vh;
     }
-    .sidebar h2 { font-size: 0.85rem; margin: 0 0 0.5rem 0; color: #555; }
-    .digest-list { list-style: none; padding: 0; margin: 0; }
-    .digest-list li { margin-bottom: 0.25rem; }
-    .digest-list a {
-      display: block;
-      padding: 0.4rem 0.5rem;
-      border-radius: 6px;
-      text-decoration: none;
-      color: #333;
-      font-size: 0.85rem;
-    }
-    .digest-list a:hover { background: #eee; }
-    .digest-list a.active { background: #e3f2fd; color: #1565c0; }
-    .content {
-      flex: 1;
-      min-width: 0;
-      background: #fff;
-      border-radius: 8px;
+    .header {
+      grid-column: 1 / -1;
       padding: 1.25rem 1.5rem;
-      box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
     }
-    .content h1 { font-size: 1.25rem; }
-    .content h2 { font-size: 1.1rem; margin-top: 1.25rem; }
-    .content ul { padding-left: 1.25rem; }
-    .content a { color: #1565c0; }
-    .empty { color: #888; font-style: italic; }
-    .loading { color: #666; }
+    .logo { font-family: "DM Serif Display", serif; font-size: 1.5rem; font-weight: 400; letter-spacing: -0.02em; color: var(--text); }
+    .logo span { color: var(--accent); }
+    .header-meta { font-size: 0.8125rem; color: var(--text-muted); }
+    .sidebar {
+      padding: 1rem;
+      background: var(--surface);
+      border-right: 1px solid var(--border);
+      overflow-y: auto;
+    }
+    .sidebar-title { font-size: 0.6875rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-muted); margin: 0 0 0.75rem 0; padding: 0 0.5rem; }
+    .digest-list { list-style: none; padding: 0; margin: 0; }
+    .digest-list li { margin-bottom: 0.5rem; }
+    .digest-card {
+      display: block;
+      padding: 0.75rem 0.875rem;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      text-decoration: none;
+      color: var(--text);
+      font-size: 0.875rem;
+      transition: border-color 0.15s, background 0.15s;
+      cursor: pointer;
+    }
+    .digest-card:hover { background: var(--surface-hover); border-color: var(--accent); }
+    .digest-card.active { background: var(--accent-muted); border-color: var(--accent); color: var(--accent-hover); }
+    .digest-card .date { font-weight: 600; margin-bottom: 0.15rem; }
+    .digest-card .meta { font-size: 0.75rem; color: var(--text-muted); }
+    .main { overflow-y: auto; padding: 1.5rem 2rem 2rem; }
+    .main-inner { max-width: 100%; margin: 0 auto; }
+    .placeholder {
+      text-align: center;
+      padding: 4rem 2rem;
+      color: var(--text-muted);
+      font-size: 0.9375rem;
+    }
+    .placeholder svg { width: 48px; height: 48px; margin-bottom: 1rem; opacity: 0.5; }
+    #digest-view { display: none; }
+    .headsup {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1.25rem 1.5rem;
+      margin-bottom: 1.25rem;
+    }
+    .headsup h1 { font-family: "DM Serif Display", serif; font-size: 1.5rem; font-weight: 400; margin: 0 0 0.25rem 0; }
+    .headsup .stamp { font-size: 0.8125rem; color: var(--text-muted); margin-bottom: 0.5rem; }
+    .headsup .summary-excerpt { font-size: 0.9rem; color: var(--text-muted); margin: 0.5rem 0 0 0; line-height: 1.5; max-height: 4em; overflow: hidden; }
+    .headsup .meta { font-size: 0.8125rem; color: var(--accent); margin-top: 0.5rem; }
+    .search-bar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem 1rem;
+      align-items: center;
+      margin-bottom: 1rem;
+    }
+    .search-bar input, .search-bar select {
+      padding: 0.45rem 0.75rem;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      background: var(--surface);
+      color: var(--text);
+      font-size: 0.875rem;
+    }
+    .search-bar input:focus, .search-bar select:focus { outline: none; border-color: var(--accent); }
+    .search-bar button {
+      padding: 0.45rem 1rem;
+      border: none;
+      border-radius: var(--radius-sm);
+      background: var(--accent);
+      color: #fff;
+      font-size: 0.875rem;
+      cursor: pointer;
+    }
+    .search-bar button:hover { background: var(--accent-hover); }
+    .table-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); }
+    .news-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.875rem;
+    }
+    .news-table th, .news-table td { padding: 0.6rem 0.75rem; text-align: left; border-bottom: 1px solid var(--border); }
+    .news-table th {
+      background: var(--bg);
+      color: var(--text-muted);
+      font-weight: 600;
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      position: sticky;
+      top: 0;
+      z-index: 1;
+    }
+    .news-table tbody tr:hover { background: var(--surface-hover); }
+    .news-table td a { color: var(--accent); text-decoration: none; }
+    .news-table td a:hover { text-decoration: underline; }
+    .news-table .col-date { white-space: nowrap; color: var(--text-muted); }
+    .news-table .col-title { max-width: 320px; }
+    .news-table .col-labels { min-width: 140px; }
+    .label-pills { display: flex; flex-wrap: wrap; gap: 0.25rem; align-items: center; }
+    .label-pill {
+      display: inline-block;
+      padding: 0.2rem 0.5rem;
+      background: var(--accent-muted);
+      color: var(--accent-hover);
+      border-radius: 999px;
+      font-size: 0.75rem;
+    }
+    .label-edit-btn {
+      padding: 0.15rem 0.4rem;
+      border: 1px dashed var(--border);
+      border-radius: 4px;
+      background: transparent;
+      color: var(--text-muted);
+      font-size: 0.75rem;
+      cursor: pointer;
+      margin-left: 0.25rem;
+    }
+    .label-edit-btn:hover { border-color: var(--accent); color: var(--accent); }
+    .label-edit-inline { display: flex; gap: 0.25rem; align-items: center; flex-wrap: wrap; }
+    .label-edit-inline input {
+      padding: 0.2rem 0.5rem;
+      border: 1px solid var(--accent);
+      border-radius: 4px;
+      background: var(--bg);
+      color: var(--text);
+      font-size: 0.8rem;
+      width: 120px;
+    }
+    .label-edit-inline button { padding: 0.2rem 0.5rem; font-size: 0.75rem; cursor: pointer; border-radius: 4px; border: none; background: var(--accent); color: #fff; }
+    .sources-card { margin-top: 2rem; padding: 1.25rem 1.5rem; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); }
+    .sources-card h2 { font-size: 0.75rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-muted); margin: 0 0 0.75rem 0; }
+    .sources-card ul { margin: 0; padding: 0; list-style: none; display: flex; flex-wrap: wrap; gap: 0.5rem 1rem; }
+    .sources-card a { font-size: 0.875rem; color: var(--accent); text-decoration: none; }
+    .sources-card a:hover { text-decoration: underline; }
+    .loading { display: flex; align-items: center; justify-content: center; padding: 3rem; color: var(--text-muted); }
+    .loading::before { content: ""; width: 20px; height: 20px; border: 2px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.7s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .empty { color: var(--text-muted); font-style: italic; }
+    .tabs { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 1rem; }
+    .tabs button { padding: 0.5rem 1rem; border: 1px solid var(--border); border-radius: 999px; background: var(--surface); color: var(--text-muted); font-size: 0.8125rem; cursor: pointer; }
+    .tabs button.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+    .category-panel { display: none; padding: 1rem 0; }
+    .category-panel.active { display: block; }
+    @media (max-width: 768px) { .app { grid-template-columns: 1fr; } .sidebar { border-right: none; border-bottom: 1px solid var(--border); } .main { padding: 1rem; } }
   </style>
 </head>
 <body>
-  <h1>AI News Digest</h1>
-  <p class="sub">Select a digest to view</p>
-  <div class="layout">
+  <div class="app">
+    <header class="header">
+      <h1 class="logo">AI News <span>Digest</span></h1>
+      <p class="header-meta">Summarized & categorized · Table view with search & labels</p>
+    </header>
     <aside class="sidebar">
-      <h2>Recent digests</h2>
+      <h2 class="sidebar-title">Digests</h2>
       <ul class="digest-list" id="list"></ul>
       <p class="empty" id="empty" style="display:none;">No digests yet. Run the pipeline to generate one.</p>
     </aside>
-    <main class="content" id="content">
-      <p class="empty" id="placeholder">Select a digest from the list.</p>
-      <div id="body" style="display:none;"></div>
+    <main class="main">
+      <div class="main-inner">
+        <div class="placeholder" id="placeholder">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 01-2-2V7m2 13a2 2 0 002-2V9a2 2 0 00-2-2h-2m-4-3H9M7 16h6M7 8h6v4H7V8z" /></svg>
+          <p>Select a digest from the sidebar to view the news table.</p>
+        </div>
+        <div id="digest-view">
+          <div class="headsup" id="headsup">
+            <h1 id="digest-title">Digest</h1>
+            <p class="stamp" id="digest-stamp"></p>
+            <p class="summary-excerpt" id="summary-excerpt"></p>
+            <p class="meta" id="headsup-meta"></p>
+          </div>
+          <div class="search-bar">
+            <input type="text" id="search-word" placeholder="Search by word..." />
+            <input type="date" id="search-from" placeholder="From" />
+            <input type="date" id="search-to" placeholder="To" />
+            <select id="search-source">
+              <option value="">All sources</option>
+            </select>
+            <select id="search-category">
+              <option value="">All categories</option>
+              <option value="News">News</option>
+              <option value="Tools">Tools</option>
+              <option value="Research">Research</option>
+              <option value="Skills & Learning">Skills & Learning</option>
+              <option value="Other">Other</option>
+            </select>
+            <button type="button" id="search-btn">Search</button>
+          </div>
+          <div id="tabs-wrap" style="display:none;">
+            <div class="tabs" id="tabs"></div>
+            <div id="panels"></div>
+          </div>
+          <div class="table-wrap" id="table-wrap">
+            <table class="news-table" id="news-table">
+              <thead>
+                <tr>
+                  <th class="col-date">Date</th>
+                  <th class="col-title">Title</th>
+                  <th>Source</th>
+                  <th>Category</th>
+                  <th class="col-labels">Labels</th>
+                  <th>Link</th>
+                </tr>
+              </thead>
+              <tbody id="table-body"></tbody>
+            </table>
+          </div>
+          <p class="empty" id="table-empty" style="display:none;">No articles match the search.</p>
+        </div>
+        <div id="loading" class="loading" style="display:none;"></div>
+        <section class="sources-card" id="sources-section">
+          <h2>Data sources</h2>
+          <ul id="sources-list"></ul>
+        </section>
+      </div>
     </main>
   </div>
   <script>
     const listEl = document.getElementById('list');
     const emptyEl = document.getElementById('empty');
     const placeholderEl = document.getElementById('placeholder');
-    const bodyEl = document.getElementById('body');
+    const digestView = document.getElementById('digest-view');
+    const loadingEl = document.getElementById('loading');
+    const tableBody = document.getElementById('table-body');
+    const tableEmpty = document.getElementById('table-empty');
+    const tableWrap = document.getElementById('table-wrap');
+    const tabsWrap = document.getElementById('tabs-wrap');
+    const tabsEl = document.getElementById('tabs');
+    const panelsEl = document.getElementById('panels');
+    const searchWord = document.getElementById('search-word');
+    const searchFrom = document.getElementById('search-from');
+    const searchTo = document.getElementById('search-to');
+    const searchSource = document.getElementById('search-source');
+    const searchCategory = document.getElementById('search-category');
+    const searchBtn = document.getElementById('search-btn');
+    let currentStamp = null;
+
+    function showPlaceholder() {
+      placeholderEl.style.display = 'block';
+      digestView.style.display = 'none';
+      loadingEl.style.display = 'none';
+    }
+    function showDigest() {
+      placeholderEl.style.display = 'none';
+      digestView.style.display = 'block';
+      loadingEl.style.display = 'none';
+    }
+    function showLoading() {
+      placeholderEl.style.display = 'none';
+      digestView.style.display = 'block';
+      loadingEl.style.display = 'flex';
+      tableWrap.style.visibility = 'hidden';
+    }
+
+    function escapeHtml(s) {
+      const div = document.createElement('div');
+      div.textContent = s;
+      return div.innerHTML;
+    }
+
+    async function loadSources() {
+      try {
+        const res = await fetch('/api/sources');
+        const sources = await res.json();
+        const ul = document.getElementById('sources-list');
+        if (!sources.length) ul.innerHTML = '<li class="empty">None configured.</li>';
+        else ul.innerHTML = sources.map(s => `<li><a href="${s.url}" target="_blank" rel="noopener">${escapeHtml(s.name || s.url)}</a></li>`).join('');
+      } catch (_) {
+        document.getElementById('sources-list').innerHTML = '<li class="empty">Could not load sources.</li>';
+      }
+    }
 
     async function loadList() {
       const res = await fetch('/api/digests');
@@ -85,32 +326,162 @@
       emptyEl.style.display = 'none';
       listEl.innerHTML = digests.map(d => {
         const label = d.stamp.replace(/_/g, ' ');
-        return `<li><a href="#" data-stamp="${d.id}">${label}</a></li>`;
+        const date = label.split(' ')[0] || label;
+        return `<li><a href="#" class="digest-card" data-stamp="${d.id}"><span class="date">${escapeHtml(date)}</span><span class="meta">${escapeHtml(label)}</span></a></li>`;
       }).join('');
-      listEl.querySelectorAll('a').forEach(a => {
+      listEl.querySelectorAll('.digest-card').forEach(a => {
         a.addEventListener('click', e => {
           e.preventDefault();
-          selectDigest(a.dataset.stamp);
-          listEl.querySelectorAll('a').forEach(x => x.classList.remove('active'));
+          currentStamp = a.dataset.stamp;
+          listEl.querySelectorAll('.digest-card').forEach(x => x.classList.remove('active'));
           a.classList.add('active');
+          selectDigest(currentStamp);
         });
       });
     }
 
-    async function selectDigest(stamp) {
-      placeholderEl.style.display = 'none';
-      bodyEl.style.display = 'block';
-      bodyEl.innerHTML = '<p class="loading">Loading…</p>';
-      const res = await fetch('/api/digests/' + encodeURIComponent(stamp));
-      const data = await res.json();
-      if (data.error) {
-        bodyEl.innerHTML = '<p class="empty">' + data.error + '</p>';
-        return;
+    function buildLabelsCell(link, labels, stamp) {
+      const span = document.createElement('span');
+      span.className = 'label-pills';
+      function render() {
+        span.innerHTML = '';
+        (labels || []).forEach(l => {
+          const pill = document.createElement('span');
+          pill.className = 'label-pill';
+          pill.textContent = l;
+          span.appendChild(pill);
+        });
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'label-edit-btn';
+        btn.textContent = labels && labels.length ? 'Edit' : '+ Add';
+        btn.addEventListener('click', () => {
+          const raw = prompt('Labels (comma-separated):', (labels || []).join(', '));
+          if (raw == null) return;
+          const newLabels = raw.split(/[,\s]+/).map(s => s.trim()).filter(Boolean);
+          fetch(`/api/digests/${encodeURIComponent(stamp)}/labels`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ link, labels: newLabels })
+          }).then(() => { labels = newLabels; render(); });
+        });
+        span.appendChild(btn);
       }
-      bodyEl.innerHTML = data.html;
+      render();
+      return span;
     }
 
+    async function loadItems(stamp) {
+      const params = new URLSearchParams();
+      if (searchWord.value) params.set('q', searchWord.value);
+      if (searchFrom.value) params.set('from', searchFrom.value);
+      if (searchTo.value) params.set('to', searchTo.value);
+      if (searchSource.value) params.set('source', searchSource.value);
+      if (searchCategory.value) params.set('category', searchCategory.value);
+      const res = await fetch(`/api/digests/${encodeURIComponent(stamp)}/items?${params}`);
+      const data = await res.json();
+      const items = data.items || [];
+      const sources = data.sources || [];
+      const currentSource = searchSource.value;
+      searchSource.innerHTML = '<option value="">All sources</option>' + sources.map(s => `<option value="${escapeHtml(s)}"${s === currentSource ? ' selected' : ''}>${escapeHtml(s)}</option>`).join('');
+      tableBody.innerHTML = '';
+      if (items.length === 0) {
+        tableEmpty.style.display = 'block';
+        tableWrap.style.display = 'none';
+        return;
+      }
+      tableEmpty.style.display = 'none';
+      tableWrap.style.display = 'block';
+      items.forEach(it => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td class="col-date">${escapeHtml(it.published_date || it.published || '—')}</td>
+          <td class="col-title">${escapeHtml(it.title || '')}</td>
+          <td>${escapeHtml(it.source_name || '—')}</td>
+          <td>${escapeHtml(it.category || '—')}</td>
+          <td class="col-labels"></td>
+          <td><a href="${escapeHtml(it.link)}" target="_blank" rel="noopener">Open</a></td>
+        `;
+        const labelCell = tr.querySelector('.col-labels');
+        labelCell.appendChild(buildLabelsCell(it.link, it.labels, stamp));
+        tableBody.appendChild(tr);
+      });
+    }
+
+    async function selectDigest(stamp) {
+      showLoading();
+      currentStamp = stamp;
+      searchWord.value = '';
+      searchFrom.value = '';
+      searchTo.value = '';
+      searchSource.value = '';
+      searchCategory.value = '';
+      tabsWrap.style.display = 'none';
+      panelsEl.innerHTML = '';
+      tabsEl.innerHTML = '';
+
+      const [digestRes, itemsRes] = await Promise.all([
+        fetch(`/api/digests/${encodeURIComponent(stamp)}`),
+        fetch(`/api/digests/${encodeURIComponent(stamp)}/items`)
+      ]);
+      const digestData = await digestRes.json();
+      const itemsData = await itemsRes.json();
+
+      if (digestData.error) {
+        showDigest();
+        tableWrap.style.visibility = 'visible';
+        document.getElementById('digest-title').textContent = 'Error';
+        document.getElementById('digest-stamp').textContent = '';
+        document.getElementById('summary-excerpt').textContent = '';
+        document.getElementById('headsup-meta').textContent = '';
+        tableBody.innerHTML = '';
+        tableEmpty.style.display = 'block';
+        tableWrap.style.display = 'none';
+        return;
+      }
+
+      showDigest();
+      tableWrap.style.visibility = 'visible';
+      document.getElementById('digest-title').textContent = 'Digest';
+      document.getElementById('digest-stamp').textContent = (stamp || '').replace(/_/g, ' ');
+      const summary = digestData.summary || '';
+      document.getElementById('summary-excerpt').textContent = summary ? summary.slice(0, 300) + (summary.length > 300 ? '…' : '') : '';
+      const count = itemsData.item_count ?? digestData.item_count ?? 0;
+      document.getElementById('headsup-meta').textContent = count + ' article' + (count !== 1 ? 's' : '');
+
+      const categories = digestData.categories || [];
+      if (categories.length > 0) {
+        tabsWrap.style.display = 'block';
+        categories.forEach((cat, i) => {
+          const btn = document.createElement('button');
+          btn.textContent = cat.title;
+          btn.type = 'button';
+          btn.classList.toggle('active', i === 0);
+          btn.addEventListener('click', () => {
+            tabsEl.querySelectorAll('button').forEach(b => b.classList.remove('active'));
+            panelsEl.querySelectorAll('.category-panel').forEach(p => p.classList.remove('active'));
+            btn.classList.add('active');
+            panelsEl.querySelector(`[data-idx="${i}"]`).classList.add('active');
+          });
+          tabsEl.appendChild(btn);
+          const panel = document.createElement('div');
+          panel.className = 'category-panel' + (i === 0 ? ' active' : '');
+          panel.dataset.idx = i;
+          panel.innerHTML = '<div class="category-panel content-body">' + cat.content + '</div>';
+          panelsEl.appendChild(panel);
+        });
+      }
+
+      await loadItems(stamp);
+    }
+
+    searchBtn.addEventListener('click', () => {
+      if (currentStamp) loadItems(currentStamp);
+    });
+    searchWord.addEventListener('keydown', e => { if (e.key === 'Enter') searchBtn.click(); });
+
     loadList();
+    loadSources();
   </script>
 </body>
 </html>
