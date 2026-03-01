@@ -1,0 +1,15 @@
+# AI news sources (RSS = free, no API key)
+# Add or remove feeds as needed.
+rss_feeds:
+  - name: TechCrunch AI
+    url: https://techcrunch.com/feed/
+    # Optional: filter by category/tag later
+  - name: MIT Technology Review
+    url: https://www.technologyreview.com/feed/
+  - name: VentureBeat AI
+    url: https://venturebeat.com/feed/
+  - name: The Verge
+    url: https://www.theverge.com/rss/index.xml
+
+# Future: optional API-based sources (will need keys & rate limits)
+# apis: []

@@ -1,0 +1,17 @@
+# Core
+pyyaml>=6.0
+python-dotenv>=1.0.0
+
+# Gather (RSS, no API cost)
+feedparser>=6.0.0
+httpx>=0.25.0
+
+# Analyze (use one; groq is free tier)
+# openai>=1.0.0
+groq>=0.4.0
+
+# Notify (SMTP = free)
+# stdlib smtplib + email; no extra deps
+
+# Optional: local DB later
+# aiosqlite>=0.19.0

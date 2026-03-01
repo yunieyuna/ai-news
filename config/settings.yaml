@@ -1,0 +1,21 @@
+# Pipeline behavior
+gather:
+  max_items_per_feed: 10
+  request_timeout_seconds: 15
+
+analyze:
+  # Options: openai, groq, none (none = skip summarization, save raw; default = no API cost)
+  provider: none
+  model: llama-3.3-70b-versatile  # Groq free tier
+  max_tokens: 500
+
+store:
+  # Where to write: local (JSON/MD files), or add sqlite later
+  backend: local
+  output_dir: data/digests
+
+notify:
+  # email, none, or add webhook later
+  method: email
+  send_on_success: true
+  send_on_failure: true
