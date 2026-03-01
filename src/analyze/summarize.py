@@ -2,10 +2,14 @@
 from __future__ import annotations
 
 import os
+import re
 from dataclasses import dataclass
 
 from src.config import get_settings
 from src.gather.rss import NewsItem
+from src.logging_config import get_logger
+
+logger = get_logger("analyze")
 
 
 @dataclass
@@ -13,6 +17,27 @@ class SummarizedDigest:
     raw_items: list[NewsItem]
     summary_text: str
     provider: str
+
+
+def _strip_html(text: str) -> str:
+    if not text:
+        return ""
+    return re.sub(r"<[^>]+>", "", text).strip()
+
+
+def _build_prompt(items: list[NewsItem], max_items: int = 30) -> str:
+    system = (
+        "You write short AI/tech news digests. Reply with a concise bullet-point summary. "
+        "Focus on what matters for someone tracking AI and ML news: key products, research, and trends. "
+        "Keep each bullet to 1–2 sentences. No preamble."
+    )
+    parts = [f"Summarize these {len(items)} headlines as a short digest.\n\n"]
+    for i, it in enumerate(items[:max_items], 1):
+        parts.append(f"{i}. [{it.source_name}] {it.title}\n   {it.link}\n")
+        if it.summary:
+            clean = _strip_html(it.summary)[:400]
+            parts.append(f"   {clean}\n")
+    return system + "\n\n" + "".join(parts)
 
 
 def summarize_items(items: list[NewsItem]) -> SummarizedDigest | None:
@@ -29,6 +54,7 @@ def summarize_items(items: list[NewsItem]) -> SummarizedDigest | None:
     if provider == "groq":
         api_key = os.getenv("GROQ_API_KEY")
         if not api_key:
+            logger.warning("Summarization skipped: GROQ_API_KEY not set")
             return SummarizedDigest(
                 raw_items=items,
                 summary_text="[Summarization skipped: GROQ_API_KEY not set]",
@@ -39,6 +65,7 @@ def summarize_items(items: list[NewsItem]) -> SummarizedDigest | None:
     if provider == "openai":
         api_key = os.getenv("OPENAI_API_KEY")
         if not api_key:
+            logger.warning("Summarization skipped: OPENAI_API_KEY not set")
             return SummarizedDigest(
                 raw_items=items,
                 summary_text="[Summarization skipped: OPENAI_API_KEY not set]",
@@ -47,18 +74,6 @@ def summarize_items(items: list[NewsItem]) -> SummarizedDigest | None:
         return _summarize_openai(items, api_key, model, max_tokens)
 
     return SummarizedDigest(raw_items=items, summary_text="", provider=provider)
-
-
-def _build_prompt(items: list[NewsItem]) -> str:
-    parts = [
-        "Summarize these AI/tech news headlines in a short digest (bullet points, 2–4 sentences per topic). "
-        "Focus on what matters for someone tracking AI news.\n\n"
-    ]
-    for i, it in enumerate(items[:30], 1):
-        parts.append(f"{i}. [{it.source_name}] {it.title}\n   {it.link}\n")
-        if it.summary:
-            parts.append(f"   {it.summary[:300]}...\n")
-    return "".join(parts)
 
 
 def _summarize_groq(
@@ -75,8 +90,10 @@ def _summarize_groq(
             max_tokens=max_tokens,
         )
         text = (resp.choices[0].message.content or "").strip()
+        logger.info("Summarized %d items with Groq", len(items))
         return SummarizedDigest(raw_items=items, summary_text=text, provider="groq")
     except Exception as e:
+        logger.exception("Summarization error: %s", e)
         return SummarizedDigest(
             raw_items=items,
             summary_text=f"[Summarization error: {e}]",
@@ -98,8 +115,10 @@ def _summarize_openai(
             max_tokens=max_tokens,
         )
         text = (resp.choices[0].message.content or "").strip()
+        logger.info("Summarized %d items with OpenAI", len(items))
         return SummarizedDigest(raw_items=items, summary_text=text, provider="openai")
     except Exception as e:
+        logger.exception("Summarization error: %s", e)
         return SummarizedDigest(
             raw_items=items,
             summary_text=f"[Summarization error: {e}]",

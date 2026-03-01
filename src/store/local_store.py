@@ -1,18 +1,40 @@
 """Save digests to local files (free, no DB cost)."""
 from __future__ import annotations
 
-from pathlib import Path
+import json
 from datetime import datetime
+from pathlib import Path
 
 from src.config import PROJECT_ROOT, get_settings
 from src.analyze.summarize import SummarizedDigest
+from src.logging_config import get_logger
+
+logger = get_logger("store")
+
+
+def _digest_to_jsonable(digest: SummarizedDigest) -> dict:
+    return {
+        "summary": digest.summary_text,
+        "provider": digest.provider,
+        "item_count": len(digest.raw_items),
+        "items": [
+            {
+                "title": it.title,
+                "link": it.link,
+                "published": it.published,
+                "source_name": it.source_name,
+            }
+            for it in digest.raw_items
+        ],
+    }
 
 
 def save_digest(digest: SummarizedDigest) -> Path:
-    """Write digest to data/digests as markdown. Returns path to main file."""
+    """Write digest to data/digests as markdown and optional JSON. Returns path to .md file."""
     settings = get_settings()
     store = settings.get("store") or {}
     output_dir = store.get("output_dir", "data/digests")
+    save_json = store.get("save_json", True)
     out = PROJECT_ROOT / output_dir
     out.mkdir(parents=True, exist_ok=True)
 
@@ -38,4 +60,15 @@ def save_digest(digest: SummarizedDigest) -> Path:
         lines.append("")
 
     md_path.write_text("\n".join(lines), encoding="utf-8")
+    logger.info("Saved digest to %s", md_path)
+
+    if save_json:
+        json_path = out / f"digest_{stamp}.json"
+        meta = {
+            "stamp": stamp,
+            "path": str(md_path),
+            **(_digest_to_jsonable(digest)),
+        }
+        json_path.write_text(json.dumps(meta, indent=2, ensure_ascii=False), encoding="utf-8")
+
     return md_path

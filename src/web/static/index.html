@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>AI News Digest</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 1rem 1.5rem;
+      color: #1a1a1a;
+      background: #f8f9fa;
+    }
+    h1 { font-size: 1.5rem; margin-bottom: 0.5rem; }
+    .sub { color: #666; font-size: 0.9rem; margin-bottom: 1.5rem; }
+    .layout { display: flex; gap: 1.5rem; align-items: start; }
+    .sidebar {
+      width: 220px;
+      flex-shrink: 0;
+      background: #fff;
+      border-radius: 8px;
+      padding: 0.75rem;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+    }
+    .sidebar h2 { font-size: 0.85rem; margin: 0 0 0.5rem 0; color: #555; }
+    .digest-list { list-style: none; padding: 0; margin: 0; }
+    .digest-list li { margin-bottom: 0.25rem; }
+    .digest-list a {
+      display: block;
+      padding: 0.4rem 0.5rem;
+      border-radius: 6px;
+      text-decoration: none;
+      color: #333;
+      font-size: 0.85rem;
+    }
+    .digest-list a:hover { background: #eee; }
+    .digest-list a.active { background: #e3f2fd; color: #1565c0; }
+    .content {
+      flex: 1;
+      min-width: 0;
+      background: #fff;
+      border-radius: 8px;
+      padding: 1.25rem 1.5rem;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+    }
+    .content h1 { font-size: 1.25rem; }
+    .content h2 { font-size: 1.1rem; margin-top: 1.25rem; }
+    .content ul { padding-left: 1.25rem; }
+    .content a { color: #1565c0; }
+    .empty { color: #888; font-style: italic; }
+    .loading { color: #666; }
+  </style>
+</head>
+<body>
+  <h1>AI News Digest</h1>
+  <p class="sub">Select a digest to view</p>
+  <div class="layout">
+    <aside class="sidebar">
+      <h2>Recent digests</h2>
+      <ul class="digest-list" id="list"></ul>
+      <p class="empty" id="empty" style="display:none;">No digests yet. Run the pipeline to generate one.</p>
+    </aside>
+    <main class="content" id="content">
+      <p class="empty" id="placeholder">Select a digest from the list.</p>
+      <div id="body" style="display:none;"></div>
+    </main>
+  </div>
+  <script>
+    const listEl = document.getElementById('list');
+    const emptyEl = document.getElementById('empty');
+    const placeholderEl = document.getElementById('placeholder');
+    const bodyEl = document.getElementById('body');
+
+    async function loadList() {
+      const res = await fetch('/api/digests');
+      const digests = await res.json();
+      if (digests.length === 0) {
+        listEl.innerHTML = '';
+        emptyEl.style.display = 'block';
+        return;
+      }
+      emptyEl.style.display = 'none';
+      listEl.innerHTML = digests.map(d => {
+        const label = d.stamp.replace(/_/g, ' ');
+        return `<li><a href="#" data-stamp="${d.id}">${label}</a></li>`;
+      }).join('');
+      listEl.querySelectorAll('a').forEach(a => {
+        a.addEventListener('click', e => {
+          e.preventDefault();
+          selectDigest(a.dataset.stamp);
+          listEl.querySelectorAll('a').forEach(x => x.classList.remove('active'));
+          a.classList.add('active');
+        });
+      });
+    }
+
+    async function selectDigest(stamp) {
+      placeholderEl.style.display = 'none';
+      bodyEl.style.display = 'block';
+      bodyEl.innerHTML = '<p class="loading">Loading…</p>';
+      const res = await fetch('/api/digests/' + encodeURIComponent(stamp));
+      const data = await res.json();
+      if (data.error) {
+        bodyEl.innerHTML = '<p class="empty">' + data.error + '</p>';
+        return;
+      }
+      bodyEl.innerHTML = data.html;
+    }
+
+    loadList();
+  </script>
+</body>
+</html>

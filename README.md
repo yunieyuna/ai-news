@@ -19,6 +19,7 @@ ai-news/
 │   ├── analyze/      # Summarization
 │   ├── store/        # Persistence
 │   ├── notify/       # Email / messaging
+│   ├── web/          # Simple UI to view digests
 │   └── run.py        # Main pipeline
 ├── data/             # Local output (gitignored)
 ├── scripts/          # Run commands
@@ -35,6 +36,16 @@ ai-news/
    ```
 2. Copy `.env.example` to `.env` and add any keys (optional for RSS-only + local store).
 3. Run: `python -m src.run` (or `./scripts/run.sh` from project root).
+
+## Web UI
+
+A simple local UI to browse saved digests:
+
+```bash
+python -m src.web.app
+```
+
+Then open **http://127.0.0.1:5000** in your browser. You’ll see a list of digests; click one to view it. No extra cost (runs locally).
 
 ## Cost notes
 

@@ -6,7 +6,11 @@ import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 
+from src.config import get_settings
 from src.analyze.summarize import SummarizedDigest
+from src.logging_config import get_logger
+
+logger = get_logger("notify")
 
 
 def send_notification(
@@ -14,7 +18,19 @@ def send_notification(
     success: bool,
     detail: str = "",
 ) -> bool:
-    """Send one email summarizing the run. Returns True if sent."""
+    """Send one email summarizing the run. Respects notify.method (email vs none). Returns True if sent."""
+    settings = get_settings()
+    notify = settings.get("notify") or {}
+    method = (notify.get("method") or "email").lower()
+    if method != "email":
+        logger.info("Notify method is %s; skipping email", method)
+        return False
+
+    if success and not notify.get("send_on_success", True):
+        return False
+    if not success and not notify.get("send_on_failure", True):
+        return False
+
     host = os.getenv("SMTP_HOST")
     port = int(os.getenv("SMTP_PORT", "587"))
     user = os.getenv("SMTP_USER")
@@ -22,7 +38,7 @@ def send_notification(
     to_addr = os.getenv("NOTIFY_EMAIL_TO")
 
     if not all([host, user, password, to_addr]):
-        print("[notify] Email skipped: set SMTP_* and NOTIFY_EMAIL_TO in .env")
+        logger.warning("Email skipped: set SMTP_* and NOTIFY_EMAIL_TO in .env")
         return False
 
     status = "Success" if success else "Failed"
@@ -43,8 +59,8 @@ def send_notification(
             server.starttls()
             server.login(user, password)
             server.sendmail(user, [to_addr], msg.as_string())
-        print("[notify] Email sent to", to_addr)
+        logger.info("Email sent to %s", to_addr)
         return True
     except Exception as e:
-        print("[notify] Email failed:", e)
+        logger.exception("Email failed: %s", e)
         return False

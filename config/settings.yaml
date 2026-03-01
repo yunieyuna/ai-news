@@ -2,6 +2,10 @@
 gather:
   max_items_per_feed: 10
   request_timeout_seconds: 15
+  dedupe_by_link: true
+  # If set, keep only items whose title or summary contains any of these (case-insensitive)
+  filter_keywords: []
+  # Example to keep only AI-related: ["AI", "GPT", "LLM", "machine learning", "OpenAI", "anthropic"]
 
 analyze:
   # Options: openai, groq, none (none = skip summarization, save raw; default = no API cost)
@@ -10,9 +14,9 @@ analyze:
   max_tokens: 500
 
 store:
-  # Where to write: local (JSON/MD files), or add sqlite later
   backend: local
   output_dir: data/digests
+  save_json: true   # also write digest_*.json next to .md
 
 notify:
   # email, none, or add webhook later
