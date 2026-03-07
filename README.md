@@ -1,103 +1,109 @@
 # AI News Helper
 
-A lightweight pipeline to gather AI-related news, summarize it, store results, and notify you when done. Built for a ~$10/month budget.
+一个轻量级的 AI 新闻聚合与摘要工具。自动从 RSS 源抓取新闻，用 LLM 生成中文摘要并分类，保存到本地，通过独立 HTML 查看器浏览。
 
 ## Pipeline
 
-1. **Gather** — Fetch headlines from RSS, then (optional) **fetch full article text** from each link for better summaries.
-2. **Analyze** — Summarize and categorize with an LLM (Ollama local, Groq, or OpenAI).
-3. **Store** — Save digests to local markdown + JSON.
-4. **Notify** — Email when done (optional).
+1. **Gather** — 从 RSS 源抓取标题，可选抓取完整文章内容以提升摘要质量。
+2. **Analyze** — 使用 LLM 生成中文摘要并分类（支持 Ollama 本地、Groq、OpenAI）。
+3. **Store** — 保存为本地 Markdown + JSON 文件。
+4. **Notify** — 完成后发送邮件通知（可选）。
 
-Full-article fetch is controlled by `gather.fetch_full_content` and `gather.max_articles_to_fetch` in `config/settings.yaml`.
-
-## Structure
+## 目录结构
 
 ```
 ai-news/
-├── config/           # Settings and source definitions
+├── config/           # 配置文件（settings.yaml、sources.yaml）
 ├── src/
-│   ├── gather/       # News fetching
-│   ├── analyze/      # Summarization
-│   ├── store/        # Persistence
-│   ├── notify/       # Email / messaging
-│   ├── web/          # Simple UI to view digests
-│   └── run.py        # Main pipeline
-├── data/             # Local output (gitignored)
-├── scripts/          # Run commands
+│   ├── gather/       # 新闻抓取
+│   ├── analyze/      # LLM 摘要
+│   ├── store/        # 本地存储
+│   ├── notify/       # 邮件通知
+│   └── run.py        # 主入口
+├── scripts/
+│   └── view_digest.py  # 独立 HTML 查看器
+├── data/             # 本地输出（已加入 .gitignore）
 └── .env.example
 ```
 
-## Setup
+## 快速开始
 
-1. Create a venv and install deps:
+1. 创建虚拟环境并安装依赖：
    ```bash
    python3 -m venv .venv
-   source .venv/bin/activate   # or .venv\Scripts\activate on Windows
+   source .venv/bin/activate   # Windows: .venv\Scripts\activate
    pip install -r requirements.txt
    ```
-2. Copy `.env.example` to `.env` and add any keys (optional for RSS-only + local store).
-3. Run: `python -m src.run` (or `./scripts/run.sh` from project root).
+2. 复制 `.env.example` 为 `.env`，按需填写 API Key（仅 Groq/OpenAI 需要）。
+3. 运行 pipeline：
+   ```bash
+   python -m src.run
+   ```
+4. 打开查看器：
+   ```bash
+   python scripts/view_digest.py
+   ```
 
-## Web UI
+## 查看器
 
-A simple local UI to browse saved digests:
+`scripts/view_digest.py` 是一个独立的 HTML 查看器，无需服务器。运行后自动在浏览器打开，左侧按日期浏览，右侧展示文章卡片和 AI 中文摘要。
 
-```bash
-python -m src.web.app
+## LLM 配置
+
+在 `config/settings.yaml` 中配置：
+
+```yaml
+analyze:
+  provider: ollama        # ollama / groq / openai / none
+  model: deepseek-r1:8b
+  max_tokens: 1200
 ```
 
-Then open **http://127.0.0.1:5000** in your browser. You’ll see a list of digests; click one to view it. No extra cost (runs locally).
+### Ollama（本地，$0）
 
-## Open-source LLM (Ollama) — $0/month
-
-To avoid any API cost, use a **local open-source model** via [Ollama](https://ollama.com):
-
-1. **Install Ollama** (macOS / Linux / Windows): https://ollama.com/download  
-2. **Pull a model** (in a terminal):
+1. 安装 [Ollama](https://ollama.com/download)
+2. 拉取模型：
    ```bash
-   ollama pull llama3.2
+   ollama pull deepseek-r1:8b
    ```
-   Other options: `mistral`, `llama3.1`, `qwen2.5` — set `analyze.model` in `config/settings.yaml` to the model name.
-3. **Config** is already set to `provider: ollama` and `model: llama3.2`. No API key needed.
-4. **Run the pipeline** — make sure Ollama is running (it starts when you `ollama run llama3.2` or run the app). The pipeline will call `http://localhost:11434/v1`.
+3. 无需 API Key，直接运行。
 
-If Ollama runs on another machine, set `OLLAMA_BASE_URL` in `.env` or `ollama_base_url` in `config/settings.yaml` (e.g. `http://192.168.1.10:11434/v1`).
+其他可用模型：`llama3.2`、`qwen2.5`、`mistral` 等，在 `config/settings.yaml` 中修改 `model` 即可。
 
----
+### Groq（免费额度）
 
-## Cost per month
+1. 在 [console.groq.com](https://console.groq.com) 注册，获取免费 API Key。
+2. 在 `.env` 中添加：`GROQ_API_KEY=gsk_xxx`
+3. 将 `provider` 改为 `groq`，`model` 改为 `llama-3.3-70b-versatile`。
 
-| Part | Option | Est. cost |
-|------|--------|-----------|
-| **Gather** | RSS feeds only | **$0** |
-| **Analyze** | Ollama (local) | **$0** |
-| **Analyze** | Groq (free tier) | **$0** |
-| **Analyze** | OpenAI (e.g. gpt-4o-mini, light use) | ~$2–5 |
-| **Store** | Local files | **$0** |
-| **Notify** | Gmail / SMTP | **$0** |
-| **Web UI** | Local Flask | **$0** |
+### OpenAI
 
-**Typical total: $0** (RSS + Ollama or Groq + local + SMTP).
+在 `.env` 中添加 `OPENAI_API_KEY`，将 `provider` 改为 `openai`。
 
-**About Cursor (this IDE):** The $2–5 above is for **this project’s APIs** (e.g. OpenAI for summarization). Cursor itself is a separate product: billing is set up in **Cursor → Settings → Account/Billing** when you choose a paid plan. If you haven’t added a card, you’re on the free tier; Cursor will only charge you if you upgrade and add payment details.
+## 费用估算
 
----
+| 模块 | 方案 | 费用 |
+|------|------|------|
+| Gather | RSS 抓取 | **$0** |
+| Analyze | Ollama 本地 | **$0** |
+| Analyze | Groq 免费额度 | **$0** |
+| Analyze | OpenAI gpt-4o-mini | ~$2–5/月 |
+| Store | 本地文件 | **$0** |
+| Notify | Gmail / SMTP | **$0** |
 
-## Data sources
+**典型总费用：$0**（RSS + Ollama 或 Groq + 本地存储）
 
-News is fetched from the RSS feeds in `config/sources.yaml`. Defaults include English, Chinese, and Japanese sources:
+## 数据源
 
-| Source | Language | URL |
-|--------|-----------|-----|
+新闻来源在 `config/sources.yaml` 中配置，默认包含：
+
+| 来源 | 语言 | 地址 |
+|------|------|------|
 | TechCrunch | EN | https://techcrunch.com/feed/ |
 | MIT Technology Review | EN | https://www.technologyreview.com/feed/ |
 | VentureBeat | EN | https://venturebeat.com/feed |
 | The Verge | EN | https://www.theverge.com/rss/index.xml |
-| GitHub Trending (daily) | EN | GitHub trending repos (via RSS) |
-| TechNode | EN (China tech) | https://technode.com/feed/ |
-| 36氪 (36Kr) | ZH | https://www.36kr.com/feed |
-| TechCrunch Japan | JA | https://jp.techcrunch.com/feed/ |
-| ITmedia | JA | https://rss.itmedia.co.jp/rss/2.0/topstory.xml |
+| TechNode | EN | https://technode.com/feed/ |
+| 36氪 | ZH | https://www.36kr.com/feed |
 
-You can add or remove feeds in `config/sources.yaml`. Optional: set `gather.filter_keywords` in `config/settings.yaml` to keep only AI-related items (e.g. `["AI", "GPT", "LLM"]`).
+可在 `config/sources.yaml` 中自由添加或删除 RSS 源。设置 `gather.filter_keywords` 可过滤只保留 AI 相关内容（如 `["AI", "GPT", "LLM"]`）。
