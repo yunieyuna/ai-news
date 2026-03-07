@@ -14,7 +14,7 @@ gather:
 analyze:
   # Options: ollama (local, free), groq (free tier), openai (paid), none
   provider: ollama
-  model: llama3.2
+  model: deepseek-r1:8b
   max_tokens: 1200
   # Only for provider=ollama: base URL (default http://localhost:11434/v1)
   # ollama_base_url: http://localhost:11434/v1

@@ -134,6 +134,7 @@ body{font-family:system-ui,-apple-system,sans-serif;background:var(--bg);
   text-decoration:none;border:1px solid var(--border);border-radius:var(--r-sm);
   padding:.225rem .55rem;white-space:nowrap}
 .read-btn:hover{border-color:var(--accent);background:var(--accent-dim)}
+.card-snip{font-size:.8125rem;color:var(--muted);margin-top:.35rem;line-height:1.55}
 .card-meta{display:flex;flex-wrap:wrap;align-items:center;gap:.3rem;margin-top:.4rem}
 .badge{display:inline-block;padding:.12rem .45rem;border-radius:999px;
   font-size:.6875rem;font-weight:600;text-transform:uppercase;letter-spacing:.04em}
@@ -152,14 +153,21 @@ body{font-family:system-ui,-apple-system,sans-serif;background:var(--bg);
 
 /* summary section */
 .sum-section{background:var(--surface);border:1px solid var(--border);
-  border-radius:var(--r);padding:1rem 1.25rem;margin-bottom:.875rem;
-  font-size:.875rem;line-height:1.7}
-.sum-section h2{font-size:.9375rem;color:var(--text);margin:.75rem 0 .35rem}
-.sum-section ul{padding-left:1.2rem}
-.sum-section li{margin-bottom:.3rem}
-.sum-section p{margin-bottom:.4rem}
+  border-radius:var(--r);padding:1rem 1.25rem;margin-bottom:.875rem}
 .sum-label{font-size:.6875rem;font-weight:600;text-transform:uppercase;
   letter-spacing:.08em;color:var(--muted);margin-bottom:.5rem}
+.sum-body{font-size:1rem;line-height:1.75}
+.sum-body h1{font-size:1.25rem;color:var(--text);margin:0 0 .75rem;font-weight:700}
+.sum-body h2{font-size:1.125rem;color:var(--text);margin:1rem 0 .4rem;font-weight:700}
+.sum-body h3{font-size:1rem;color:var(--text);margin:.75rem 0 .3rem;font-weight:600}
+.sum-body h4{font-size:1rem;color:var(--accent-h);margin:.75rem 0 .25rem;font-weight:600}
+.sum-body ul{padding-left:1.4rem}
+.sum-body li{margin-bottom:.4rem}
+.sum-body p{margin-bottom:.5rem}
+.sum-body strong{color:var(--text);font-weight:600}
+.sum-body em{color:var(--accent-h);font-style:italic}
+.sum-body a{color:var(--accent-h);text-decoration:none;border-bottom:1px solid rgba(129,140,248,.35)}
+.sum-body a:hover{border-bottom-color:var(--accent-h)}
 
 @media(max-width:640px){
   .app{grid-template-columns:1fr;grid-template-rows:52px 140px 1fr;height:auto}
@@ -185,6 +193,40 @@ function fmtDate(d) {
     const mo=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
     return mo[+m-1]+' '+(+day)+', '+y;
   } catch { return d; }
+}
+
+function inlineMd(s) {
+  s = s.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');
+  s = s.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+  s = s.replace(/(?<!\*)\*(?!\*)(.+?)(?<!\*)\*(?!\*)/g, '<em>$1</em>');
+  return s;
+}
+
+function renderMd(md) {
+  const lines = md.split('\\n');
+  let out = '';
+  let inUl = false;
+  lines.forEach(line => {
+    const h4 = line.match(/^####\\s+(.+)/);
+    const h3 = !h4 && line.match(/^###\\s+(.+)/);
+    const h2 = !h4 && !h3 && line.match(/^##\\s+(.+)/);
+    const h1 = !h4 && !h3 && !h2 && line.match(/^#\\s+(.+)/);
+    const li = line.match(/^[*-]\\s+(.+)/);
+    if (h4 || h3 || h2 || h1) {
+      if (inUl) { out += '</ul>'; inUl = false; }
+      const tag = h4 ? 'h4' : h3 ? 'h3' : h2 ? 'h2' : 'h1';
+      const txt = (h4||h3||h2||h1)[1];
+      out += '<' + tag + '>' + inlineMd(esc(txt)) + '</' + tag + '>';
+    } else if (li) {
+      if (!inUl) { out += '<ul>'; inUl = true; }
+      out += '<li>' + inlineMd(esc(li[1])) + '</li>';
+    } else {
+      if (inUl) { out += '</ul>'; inUl = false; }
+      if (line.trim()) out += '<p>' + inlineMd(esc(line)) + '</p>';
+    }
+  });
+  if (inUl) out += '</ul>';
+  return out;
 }
 
 function catCls(c) {
@@ -219,11 +261,13 @@ function renderArticles(items) {
 
     const card = document.createElement('div');
     card.className = 'card' + (isMust?' must':'');
+    const snip = (it.summary||'').replace(/<[^>]+>/g,'').trim().slice(0,200);
     card.innerHTML =
       '<div class="card-top">' +
         '<div class="card-title"><a href="'+esc(it.link)+'" target="_blank" rel="noopener">'+esc(it.title||'Untitled')+'</a></div>' +
         '<a class="read-btn" href="'+esc(it.link)+'" target="_blank" rel="noopener">Read →</a>' +
       '</div>' +
+      (snip?'<div class="card-snip">'+esc(snip)+(it.summary.length>200?'…':'')+'</div>':'')+
       '<div class="card-meta">' +
         (it.source_name?'<span class="badge b-src">'+esc(it.source_name)+'</span>':'')+
         (cat?'<span class="badge '+cat.cls+'">'+esc(cat.lbl)+'</span>':'')+
@@ -267,29 +311,10 @@ function showDigest(data) {
 
   // summary / LLM output
   const sumEl = $('sum-section');
-  const sumMd = (data.summary||'').trim();
+  const sumMd = (data.summary||'').replace(/<think>[\s\S]*?<\/think>/g,'').trim();
   if (sumMd && !sumMd.startsWith('[Summarization error')) {
     sumEl.style.display = '';
-    // render markdown line by line
-    const lines = sumMd.split('\\n');
-    let out = '';
-    let inUl = false;
-    lines.forEach(line => {
-      const h2 = line.match(/^##\s+(.+)/);
-      const li = line.match(/^[*-]\s+(.+)/);
-      if (h2) {
-        if (inUl) { out += '</ul>'; inUl = false; }
-        out += '<h2>' + esc(h2[1]) + '</h2>';
-      } else if (li) {
-        if (!inUl) { out += '<ul>'; inUl = true; }
-        out += '<li>' + esc(li[1]) + '</li>';
-      } else {
-        if (inUl) { out += '</ul>'; inUl = false; }
-        if (line.trim()) out += '<p>' + esc(line) + '</p>';
-      }
-    });
-    if (inUl) out += '</ul>';
-    sumEl.innerHTML = '<div class="sum-label">AI Summary</div>' + out;
+    sumEl.innerHTML = '<div class="sum-label">AI Summary</div><div class="sum-body">' + renderMd(sumMd) + '</div>';
   } else {
     sumEl.style.display = 'none';
   }

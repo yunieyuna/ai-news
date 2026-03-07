@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import os
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from src.config import get_settings
 from src.gather.rss import NewsItem
@@ -17,6 +17,7 @@ class SummarizedDigest:
     raw_items: list[NewsItem]
     summary_text: str
     provider: str
+    summary_zh: str = field(default="")
 
 
 def _strip_html(text: str) -> str:
@@ -25,34 +26,46 @@ def _strip_html(text: str) -> str:
     return re.sub(r"<[^>]+>", "", text).strip()
 
 
-def _build_prompt(items: list[NewsItem], max_items: int = 25) -> str:
-    system = (
-        "You write AI/tech news digests focused on LEARNING VALUE. "
-        "Your goal: help the reader identify what is most worth studying this week.\n\n"
-        "Reply using these markdown section headers (##) in this order "
-        "(skip any section with no relevant content):\n"
-        "## 🔥 Must Read — the 2–3 most impactful items everyone following AI should know\n"
-        "## News — company moves, product launches, policy, industry shifts\n"
-        "## Tools — new apps, APIs, or dev tools worth trying\n"
-        "## Research — papers, model releases, technical breakthroughs\n"
-        "## Skills & Learning — tutorials, courses, how-tos\n"
-        "## Other — anything else notable\n\n"
-        "Under each ## header write 2–4 bullet points. For each bullet:\n"
-        "1) One concise English sentence with the key point.\n"
-        "2) Next line: short Simplified Chinese explanation (简体中文) of the same point.\n\n"
-        "After all sections, always finish with:\n"
-        "## 📚 Skills to Study This Week\n"
-        "List 3–5 specific skills or technologies from this digest that are most worth studying. "
-        "For each, write one sentence explaining why it matters right now.\n\n"
-        "No intro, no preamble. Be specific and actionable. "
-        "Focus on what matters for someone actively learning AI/ML."
-    )
-    parts = [
-        f"Summarize the following {len(items)} articles into the categories above. "
-        "Use the full article text when provided.\n\n"
-    ]
+def _strip_think(text: str) -> str:
+    """Remove <think>...</think> chain-of-thought blocks (e.g. DeepSeek-R1)."""
+    return re.sub(r"<think>.*?</think>", "", text, flags=re.DOTALL).strip()
+
+
+def _clean_output(text: str) -> str:
+    """Strip any model preamble before the first ## header."""
+    m = re.search(r"^##", text, re.MULTILINE)
+    return text[m.start():].strip() if m else text
+
+
+_SYSTEM_PROMPT = (
+    "你是AI/科技新闻摘要编辑。\n"
+    "重要规则：\n"
+    "1. 全部用简体中文输出，禁止使用英文、日文或其他语言。\n"
+    "2. 直接从第一个##标题开始，不要任何开场白或解释。\n"
+    "3. 严格按照下面的格式输出，不要改变结构。\n\n"
+    "格式（有内容才写该分类）：\n"
+    "## 🔥 必读\n"
+    "- 一句话核心要点。（[阅读原文](文章URL)）\n"
+    "## 新闻\n"
+    "- 一句话核心要点。（[阅读原文](文章URL)）\n"
+    "## 工具\n"
+    "- 一句话核心要点。（[阅读原文](文章URL)）\n"
+    "## 研究\n"
+    "- 一句话核心要点。（[阅读原文](文章URL)）\n"
+    "## 技能与学习\n"
+    "- 一句话核心要点。（[阅读原文](文章URL)）\n"
+    "## 其他\n"
+    "- 一句话核心要点。（[阅读原文](文章URL)）\n"
+    "## 📚 本周值得学习的技能\n"
+    "- 技能名称：一句话说明为何现在学它重要。\n"
+)
+
+
+def _build_messages(items: list[NewsItem], max_items: int = 20) -> list[dict]:
+    """Return a messages list with separate system and user roles."""
+    parts = [f"请整理以下 {len(items[:max_items])} 篇文章：\n\n"]
     for i, it in enumerate(items[:max_items], 1):
-        parts.append(f"--- Article {i}: [{it.source_name}] {it.title} ---\n")
+        parts.append(f"--- 文章 {i}: [{it.source_name}] {it.title} ---\n")
         parts.append(f"URL: {it.link}\n\n")
         if it.full_text:
             parts.append(it.full_text[:2800].strip())
@@ -61,9 +74,27 @@ def _build_prompt(items: list[NewsItem], max_items: int = 25) -> str:
         elif it.summary:
             parts.append(_strip_html(it.summary)[:800])
         else:
-            parts.append("(No content)")
+            parts.append("(无内容)")
         parts.append("\n\n")
-    return system + "\n\n" + "".join(parts)
+    return [
+        {"role": "system", "content": _SYSTEM_PROMPT},
+        {"role": "user", "content": "".join(parts)},
+    ]
+
+
+def _build_prompt(items: list[NewsItem], max_items: int = 25) -> str:
+    """Legacy single-string prompt for providers that don't use message lists."""
+    msgs = _build_messages(items, max_items)
+    return msgs[0]["content"] + "\n\n" + msgs[1]["content"]
+
+
+def _translate_prompt(english_summary: str) -> str:
+    return (
+        "Translate the following AI news digest to Simplified Chinese (简体中文). "
+        "Preserve all markdown formatting exactly (## headers, * bullets, **bold**). "
+        "Keep URLs, model names, and company names in English.\n\n"
+        + english_summary
+    )
 
 
 def summarize_items(items: list[NewsItem]) -> SummarizedDigest | None:
@@ -119,8 +150,18 @@ def _summarize_groq(
             max_tokens=max_tokens,
         )
         text = (resp.choices[0].message.content or "").strip()
+        zh = ""
+        try:
+            tr = client.chat.completions.create(
+                model=model or "llama-3.3-70b-versatile",
+                messages=[{"role": "user", "content": _translate_prompt(text)}],
+                max_tokens=max_tokens,
+            )
+            zh = (tr.choices[0].message.content or "").strip()
+        except Exception as e:
+            logger.warning("Chinese translation failed: %s", e)
         logger.info("Summarized %d items with Groq", len(items))
-        return SummarizedDigest(raw_items=items, summary_text=text, provider="groq")
+        return SummarizedDigest(raw_items=items, summary_text=text, provider="groq", summary_zh=zh)
     except Exception as e:
         logger.exception("Summarization error: %s", e)
         return SummarizedDigest(
@@ -144,8 +185,18 @@ def _summarize_openai(
             max_tokens=max_tokens,
         )
         text = (resp.choices[0].message.content or "").strip()
+        zh = ""
+        try:
+            tr = client.chat.completions.create(
+                model=model or "gpt-4o-mini",
+                messages=[{"role": "user", "content": _translate_prompt(text)}],
+                max_tokens=max_tokens,
+            )
+            zh = (tr.choices[0].message.content or "").strip()
+        except Exception as e:
+            logger.warning("Chinese translation failed: %s", e)
         logger.info("Summarized %d items with OpenAI", len(items))
-        return SummarizedDigest(raw_items=items, summary_text=text, provider="openai")
+        return SummarizedDigest(raw_items=items, summary_text=text, provider="openai", summary_zh=zh)
     except Exception as e:
         logger.exception("Summarization error: %s", e)
         return SummarizedDigest(
@@ -164,15 +215,38 @@ def _summarize_ollama(
 
         base_url = analyze.get("ollama_base_url") or os.getenv("OLLAMA_BASE_URL") or "http://localhost:11434/v1"
         client = OpenAI(base_url=base_url, api_key="ollama")
-        prompt = _build_prompt(items)
         resp = client.chat.completions.create(
             model=model or "llama3.2",
-            messages=[{"role": "user", "content": prompt}],
+            messages=_build_messages(items),
             max_tokens=max_tokens,
         )
-        text = (resp.choices[0].message.content or "").strip()
+        text = _clean_output(_strip_think((resp.choices[0].message.content or "").strip()))
+
+        # Translate to Chinese (local models often ignore Chinese instructions)
+        zh = text
+        try:
+            tr_messages = [
+                {
+                    "role": "system",
+                    "content": (
+                        "你是翻译助手。将输入的新闻摘要翻译成简体中文。"
+                        "严格保留所有markdown格式（##标题、-列表、**粗体**、链接）。"
+                        "公司名、模型名、URL保持英文不变。只输出翻译结果，不要任何解释。"
+                    ),
+                },
+                {"role": "user", "content": text},
+            ]
+            tr_resp = client.chat.completions.create(
+                model=model or "llama3.2",
+                messages=tr_messages,
+                max_tokens=max_tokens,
+            )
+            zh = _strip_think((tr_resp.choices[0].message.content or "").strip()) or text
+        except Exception as e:
+            logger.warning("Chinese translation failed: %s", e)
+
         logger.info("Summarized %d items with Ollama", len(items))
-        return SummarizedDigest(raw_items=items, summary_text=text, provider="ollama")
+        return SummarizedDigest(raw_items=items, summary_text=zh, provider="ollama")
     except Exception as e:
         logger.exception("Summarization error: %s", e)
         return SummarizedDigest(

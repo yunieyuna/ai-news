@@ -15,6 +15,7 @@ logger = get_logger("store")
 def _digest_to_jsonable(digest: SummarizedDigest) -> dict:
     return {
         "summary": digest.summary_text,
+        "summary_zh": digest.summary_zh,
         "provider": digest.provider,
         "item_count": len(digest.raw_items),
         "items": [
@@ -23,6 +24,7 @@ def _digest_to_jsonable(digest: SummarizedDigest) -> dict:
                 "link": it.link,
                 "published": it.published,
                 "source_name": it.source_name,
+                "summary": it.summary or "",
             }
             for it in digest.raw_items
         ],
